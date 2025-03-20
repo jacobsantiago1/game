@@ -1,0 +1,264 @@
+'''
+game thingy!
+'''
+# to install, type: "pip install pygame"
+import pygame # this is a non-core library which will help with writing games in pythonxxwsxwsxwsxwsxwsx
+
+# random and sys are CORE LIBRARIES - no need to install them
+import random # random
+import sys
+import time # time stuff
+
+pygame.init # initiate pygame
+clock = pygame.time.Clock()
+pygame.font.init()
+font = pygame.font.SysFont("comicsansms", 50)
+    
+# ez variables
+WIDTH = 1280
+HEIGHT = 720
+SKYBLUE = (135, 206, 235)
+BLUE = (0, 0, 255)
+RED = (255, 0, 0)
+GREEN = (0, 255, 0)
+
+# menu images
+
+screen = pygame.display.set_mode((WIDTH, HEIGHT))
+pygame.display.set_caption("Where The Wind Goes")
+
+# Load button image
+button1 = pygame.image.load("game/playbtn.png").convert_alpha()
+
+# Button class
+class playButton():
+    def __init__(self, x, y, image, scale):
+        btnwidth = image.get_width()
+        btnheight = image.get_height()
+        self.image = pygame.transform.scale(image, (int(btnwidth * scale), int(btnheight * scale)))
+        self.rect = self.image.get_rect()
+        self.rect.topleft = (x, y)
+        self.clicked = False  # Initialize clicked state
+
+    def draw(self):
+        action = False
+        pos = pygame.mouse.get_pos()
+
+        # Check if the mouse is over the button
+        if self.rect.collidepoint(pos):
+            for event in pygame.event.get():
+                if event.type == pygame.MOUSEBUTTONDOWN and not self.clicked:
+                    self.clicked = True
+                    action = True
+                if event.type == pygame.MOUSEBUTTONUP:
+                    self.clicked = False
+
+        screen.blit(self.image, (self.rect.x, self.rect.y))
+        return action
+
+# Create button instance
+playbuttoninstance = playButton(450, 100, button1, 2)
+
+# menu loop
+menurun = True
+while menurun:
+    screen.fill(SKYBLUE)
+
+    if playbuttoninstance.draw() == True:
+        print("Button clicked!")
+        gamerunning = True
+        menurun = False
+
+    # Event handling
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            menurun = False
+
+    pygame.display.flip()  # update
+
+
+
+jumpHeight = -25
+playerHeight = 100
+playerWidth = 30
+
+'''main game loop'''
+class Player:
+    def __init__(self, speed, x, y, gravity=0.5, fall_multiplier=1.5,): # player charactaristics
+
+        # self.rect = pygame.Rect(x, y, playerWidth, playerHeight)
+
+        # load images  
+        self.image_standing = pygame.image.load("game/playerstand.png").convert_alpha()
+        self.image_jumping = pygame.image.load("game/playerjump.png").convert_alpha()
+
+        # default image
+        self.image = self.image_standing 
+
+        # default hitbox image size
+        self.rect = self.image.get_rect(midbottom=(100, HEIGHT))
+
+        # hitboxes
+
+        self.hitbox_standing = pygame.Rect(self.rect.x, self.rect.y, self.rect.width, self.rect.height)  
+        self.hitbox_jumping = pygame.Rect(self.rect.x + 10, self.rect.y, self.rect.width + 60, self.rect.height - 30)  
+        self.hitbox_crouching = pygame.Rect(self.rect.x + 5, self.rect.y + 10, self.rect.width - 10, self.rect.height - 20)  
+
+        # default hitbox
+        self.hitbox = self.hitbox_standing
+        
+        # other stuff
+        self.speed = 10
+        self.gravity = gravity
+        self.velocity = pygame.Vector2(0,0)
+        self.jump_cutoff = 0.5  # how much velocity lost when key released early
+        self.fall_multiplier = fall_multiplier  # increases falling speed
+        self.on_ground = False  # is the player on the ground?if keys[pygame.K_c]:
+        
+
+    def movementEngine(self, keys):
+        # x movement
+        self.velocity.x = 0
+        if keys[pygame.K_LEFT] or keys[pygame.K_a]:
+            self.velocity.x = -self.speed
+        if keys[pygame.K_RIGHT] or keys[pygame.K_d]:
+            self.velocity.x = self.speed
+
+        # gravity application
+        if self.velocity.y > 0:  # If falling, apply extra gravity
+            self.velocity.y += self.gravity * self.fall_multiplier
+        else:  # Normal gravity when rising
+            self.velocity.y += self.gravity 
+
+        # jumping
+        if (keys[pygame.K_SPACE] or keys[pygame.K_w] or keys[pygame.K_UP]) and self.on_ground:
+            self.velocity.y = jumpHeight  # how high the player can jump
+
+        # jump cutoff
+        if not (keys[pygame.K_SPACE] or keys[pygame.K_w] or keys[pygame.K_UP]) and self.velocity.y < 0: # if key space is pressed
+            self.velocity.y *= self.jump_cutoff 
+
+        # ground smash thing SLIDE
+        if (keys[pygame.K_s] or keys[pygame.K_DOWN]) and self.on_ground == False:
+            self.velocity.y += 2
+        
+        # movement application
+        self.rect.x += self.velocity.x
+        self.rect.y += self.velocity.y
+
+        # stop player from exititing walls
+        if self.rect.left < 0:  # Prevent moving past left wall
+            self.rect.left = 0
+        if self.rect.right > WIDTH:  # Prevent moving past right wall
+            self.rect.right = WIDTH
+
+        # groundcheck
+        if self.rect.bottom >= HEIGHT:  # ground sim
+            self.rect.bottom = HEIGHT
+            self.on_ground = True
+            self.velocity.y = 0
+        else:
+            self.on_ground = False
+
+        # frame change
+        if self.on_ground:
+            self.image = self.image_standing  # standing
+            self.hitbox = self.hitbox_standing
+
+        else:
+            # print("hello")
+            self.image = self.image_jumping  # jumping
+            self.hitbox = self.hitbox_jumping
+            
+        self.hitbox.topleft = (self.rect.x, self.rect.y)
+
+
+    def draw(self, screen):
+        screen.blit(self.image, self.rect)
+        # pygame.draw.rect(screen, (0, 255, 0), self.hitbox, 2)  # debugging hitbox
+
+class FlyingObstacle:
+    def __init__(self, x, y, speed,):       
+        self.speed = speed
+        if speed > 8:
+            self.rect = pygame.Rect(x, y, 50, 50)  # Obstacle hitbox    
+        else:
+            self.rect = pygame.Rect(x, y, 50, 300)
+    def update(self):
+        self.rect.x -= self.speed  # Move left
+
+    def draw(self, screen):
+        pygame.draw.rect(screen, RED, self.rect)  # Red rectangle
+
+def game_over_screen():
+    screen.fill((0, 0, 0))  # Black background
+    font = pygame.font.Font(None, 50)
+    text = font.render("Game Over! Press R to Restart", True, (255, 255, 255))
+    text_rect = text.get_rect(center=(WIDTH // 2, HEIGHT // 2))
+    screen.blit(text, text_rect)
+    pygame.display.flip()  # Update screen
+
+
+    gameOverScreeRunning = True
+    while gameOverScreeRunning:  # This loop keeps the game on the Game Over screen
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                exit()
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_r:  # Restart when 'R' is pressed
+                    gameOverScreeRunning = False  # Exit loop and restart game
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_x:
+                    pygame.QUIT
+
+
+# Initialize player
+player = Player(WIDTH // 2, HEIGHT // 2, 1)
+
+obstacles = [] # list to store obstacles
+spawn_timer = 0  # spawning control
+
+gamerunning = True
+while gamerunning:
+    clock.tick(60)  # 60fps
+    screen.fill(SKYBLUE)  # fill screen with background colour
+
+    # event handling
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            gamerunning = False
+
+    # movement engine handling
+    keys = pygame.key.get_pressed()
+    player.movementEngine(keys)
+
+        # respawn obstacle every X amount of frames
+    spawn_timer += 1
+    if spawn_timer > 60: 
+        y_position = random.randint(50, HEIGHT - 100)  # spawn at a random height
+        obstacles.append(FlyingObstacle(WIDTH, y_position, speed=random.randint(1,15))) # create copy of obstacle
+        spawn_timer = 0
+
+    # update and draw
+    for obstacle in obstacles[:]:
+        obstacle.update()
+        obstacle.draw(screen)
+
+        # collision detection
+        if player.hitbox.colliderect(obstacle.rect):
+            game_over_screen()
+            obstacles.clear()
+            player.rect.topleft = (50, HEIGHT // 2)
+            spawn_timer = 0
+
+        # delete off screen blocks
+        if obstacle.rect.right < 0:
+            obstacles.remove(obstacle)
+
+    # draw everything
+    player.draw(screen)
+
+    pygame.display.flip()  # update
+
+pygame.quit()
