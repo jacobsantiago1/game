@@ -120,6 +120,13 @@ exitbuttoninstance = button(30, 600, button2, 1, "Leave Game", (250, 625))
 namebuttoninstance = button(30, 390, namebtn, 1, "Enter your username!", (300,415))
 diffbuttoninstance = button(30, 170, diffbtn, 1, "Set the difficulty! 1-3", (300,195))
 
+def errormsg():
+    enterusernametxt = font.render("enter username", False, (0,0,0))
+    for i in range(60):    
+        screen.blit(enterusernametxt, (10,60))
+        
+          
+
 def menuscreen():
     global score, highScore, username, gamedifficulty
     score = 0
@@ -181,8 +188,7 @@ def menuscreen():
             if username != "Guest User":
                 menurun = False
             else:
-                enterusernametxt = font.render("enter username", False, (0,0,0))
-                screen.blit(enterusernametxt, (10,60))
+                errormsg()
                 namemenu = True
 
 
@@ -473,5 +479,3 @@ def maingameloop(gamedifficulty):
     pygame.quit()
 
 maingameloop(gamedifficulty)
-
-
